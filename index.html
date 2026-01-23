@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" class="h-100" data-bs-theme="auto">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Welcome</title>
+      <!-- Favicons -->
+     <script src="https://code.jquery.com/jquery-4.0.0.min.js" integrity="sha256-OaVG6prZf4v69dPg6PhVattBXkcOWQB62pdZ3ORyrao=" crossorigin="anonymous"></script>
+        <script src="script.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/2.1.3/TweenMax.min.js" integrity="sha512-DkPsH9LzNzZaZjCszwKrooKwgjArJDiEjA5tTgr3YX4E6TYv93ICS8T41yFHJnnSmGpnf0Mvb5NhScYbwvhn2w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- Custom styles for this template -->
+    <link href="style.css" rel="stylesheet">
+  </head>
+
+  <body class="d-flex h-100 text-center">
+
+        <div class="d-flex w-100 h-100 p-3 mx-auto flex-column parent">
+            <div id="results">
+            <span id="final_span" class="final"></span>
+            <span id="interim_span" class="interim"></span>
+            <p>
+            </div>
+
+            <div id="visualization"></div>
+
+            <div id="button">
+            <svg xmlns="http://www.w3.org/2000/svg" version="1.1" id="microphone" data-container-transform="translate(3)" viewBox="0 0 16 20" x="0px" y="0px"><path d="M4.5 0c-1.4 0-2.5 1.1-2.5 2.5v5c0 1.4 1.1 2.5 2.5 2.5s2.5-1.1 2.5-2.5v-5c0-1.4-1.1-2.5-2.5-2.5zm-4.125 6.188a.5.5 0 0 0-.375.5v.813c0 2.302 1.763 4.184 4 4.438v3.063h-2c-.6 0-1 .4-1 1h7c0-.6-.4-1-1-1h-2v-3.063c2.237-.254 4-2.136 4-4.438v-.813a.5.5 0 1 0-1 0v.813c0 1.927-1.573 3.5-3.5 3.5s-3.5-1.573-3.5-3.5v-.813a.5.5 0 0 0-.563-.5.5.5 0 0 0-.063 0z" transform="translate(3)"/></svg>
+            <div id="contents"></div>
+            </div>
+
+            <div id="viz1" class="visual"></div>
+            <div id="viz2" class="visual"></div>
+            <div id="viz3" class="visual"></div>
+            <div id="viz4" class="visual"></div>
+            <div id="tip">Press and hold to speak</div>
+        </div>
+   </body>
+</html>
