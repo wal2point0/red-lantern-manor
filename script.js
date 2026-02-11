@@ -230,7 +230,7 @@ $(function() {
     string = string.toLowerCase();
     success = false;
     $.each(keywords, function() {
-      if ($.isArray(this.keyword)) {
+      if (Array.isArray(this.keyword)) {
         var self = this;
         $(this.keyword).each(function() {
           var keyword = this.toLowerCase();
