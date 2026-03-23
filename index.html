@@ -10,11 +10,6 @@
   </head>
 
   <body class="d-flex h-100 text-center" style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); color: rgba(255, 255, 255, 0.9);">
-    <!-- FIXED ADMIN BUTTON -->
-    <button type="button" class="btn btn-primary btn-lg" id="fixedAdminButton" data-bs-toggle="modal" data-bs-target="#modalAdminLogin" title="Admin Login" style="position: fixed; top: 15px; right: 15px; z-index: 1001;">
-      <i class="bi bi-shield-lock"></i> Admin
-    </button>
-    
     <div class="d-flex w-100 h-100 p-3 mx-auto flex-column parent" style="overflow-y: auto;">
 
       <!-- WELCOME SECTION -->
@@ -24,61 +19,7 @@
         <div style="margin-bottom: 1.5rem;">
           <button type="button" class="btn btn-warning btn-lg" id="introButton">Get Started</button>
         </div>
-      </div>
-
-      <!-- ADMIN DASHBOARD -->
-      <div id="adminPanel" style="display: none;">
-        <div class="container-fluid">
-          <div class="row mb-4">
-            <div class="col">
-              <h2>📊 Admin Dashboard</h2>
-              <button class="btn btn-warning float-end" id="adminLogout">Logout</button>
-            </div>
-          </div>
-
-          <!-- Create Food -->
-          <div class="row mb-4">
-            <div class="col-md-6">
-              <div class="card bg-dark">
-                <div class="card-header">➕ Create Food Item</div>
-                <div class="card-body">
-                  <form id="adminFormFood">
-                    <div class="mb-2">
-                      <input type="text" id="adminFoodName" class="form-control" placeholder="Food name" required>
-                    </div>
-                    <div class="mb-2">
-                      <input type="text" id="adminFoodDesc" class="form-control" placeholder="Description">
-                    </div>
-                    <div class="mb-2">
-                      <input type="number" id="adminFoodPrice" class="form-control" placeholder="Price" step="0.01" required>
-                    </div>
-                    <button type="button" class="btn btn-success w-100" id="adminCreateFood">Create Item</button>
-                  </form>
-                </div>
-              </div>
-            </div>
-
-            <!-- Menu Management -->
-            <div class="col-md-6">
-              <div class="card bg-dark">
-                <div class="card-header">📋 Food Menu</div>
-                <div class="card-body" id="adminMenuList" style="max-height: 300px; overflow-y: auto;"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Orders History -->
-          <div class="row">
-            <div class="col">
-              <div class="card bg-dark">
-                <div class="card-header">📦 All Orders</div>
-                <div class="card-body" id="adminOrdersList" style="max-height: 400px; overflow-y: auto;">
-                  <p class="text-muted">No orders yet</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <p class="small text-muted">Admin interface: <a href="admin.html" class="text-info">/admin.html</a></p>
       </div>
 
       <!-- MAIN CONTENT -->
@@ -131,35 +72,6 @@
         </div>
       </div>
 
-    </div>
-
-    <!-- MODAL: ADMIN LOGIN -->
-    <div class="modal fade" id="modalAdminLogin" tabindex="-1" data-bs-backdrop="static">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">🔐 Admin Login</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <form id="adminLoginForm">
-              <div class="mb-3">
-                <label for="adminUsername" class="form-label">Username</label>
-                <input type="text" class="form-control" id="adminUsername" placeholder="admin" required>
-              </div>
-              <div class="mb-3">
-                <label for="adminPassword" class="form-label">Password</label>
-                <input type="password" class="form-control" id="adminPassword" placeholder="password" required>
-              </div>
-              <small class="text-muted">Demo: admin / password</small>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-primary" id="adminLoginBtn">Login</button>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- MODAL: CREATE FOOD ITEM -->

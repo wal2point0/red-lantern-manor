@@ -8,12 +8,10 @@ $(function() {
   ];
   let cart = JSON.parse(localStorage.getItem('cart')) || [];
   let orders = JSON.parse(localStorage.getItem('orders')) || [];
-  let isAdmin = false;
   
   // DOM selectors
   const intro = $('#introduction');
   const main = $('#mainContent');
-  const adminPanel = $('#adminPanel');
   const cards = $('#cards');
   const cartBadge = $('#cartCount');
   const cartItems = $('#cartItems');
@@ -25,12 +23,7 @@ $(function() {
   const finalSpan = $('#final_span');
   const interimSpan = $('#interim_span');
   
-  // Admin elements
-  const adminCreateBtn = $('#adminCreateFood');
-  const adminLogoutBtn = $('#adminLogout');
-  const adminLoginBtn = $('#adminLoginBtn');
-  const adminMenuList = $('#adminMenuList');
-  const adminOrdersList = $('#adminOrdersList');
+  // Admin functionality is handled in admin.js
   
   // Device detection
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|BlackBerry/i.test(navigator.userAgent);
@@ -143,121 +136,7 @@ $(function() {
     }
   }
   
-  // Admin Login
-  adminLoginBtn.click(function() {
-    const username = $('#adminUsername').val();
-    const password = $('#adminPassword').val();
-    
-    if (username === 'admin' && password === 'password') {
-      isAdmin = true;
-      intro.hide();
-      adminPanel.show();
-      main.hide();
-      bootstrap.Modal.getInstance(document.getElementById('modalAdminLogin')).hide();
-      renderAdminDashboard();
-      alert('✓ Admin login successful!');
-    } else {
-      alert('❌ Invalid credentials');
-    }
-  });
-  
-  // Admin Logout
-  adminLogoutBtn.click(function() {
-    isAdmin = false;
-    adminPanel.hide();
-    intro.show();
-    $('#fixedAdminButton').show();
-    $('#adminUsername').val('');
-    $('#adminPassword').val('');
-  });
-  
-  // Admin Create Food
-  adminCreateBtn.click(function() {
-    const name = $('#adminFoodName').val().trim();
-    const desc = $('#adminFoodDesc').val().trim();
-    const price = $('#adminFoodPrice').val().trim();
-    
-    if (!name || !price) {
-      alert('Please fill in all required fields');
-      return;
-    }
-    
-    const newFood = {
-      id: Math.max(...foodMenu.map(f => f.id), 0) + 1,
-      name: name,
-      desc: desc || 'Delicious food',
-      price: parseFloat(price)
-    };
-    
-    foodMenu.push(newFood);
-    localStorage.setItem('foodMenu', JSON.stringify(foodMenu));
-    $('#adminFormFood')[0].reset();
-    renderAdminDashboard();
-    alert('✓ Food item created!');
-  });
-  
-  // Render Admin Dashboard
-  function renderAdminDashboard() {
-    // Food menu list
-    adminMenuList.empty();
-    foodMenu.forEach(food => {
-      const item = `
-        <div class="card mb-2 bg-dark-2">
-          <div class="card-body p-2">
-            <div class="row align-items-center">
-              <div class="col-7">
-                <h6 class="mb-0">${food.name}</h6>
-                <small class="text-muted">£${food.price.toFixed(2)}</small>
-              </div>
-              <div class="col-5 text-end">
-                <button class="btn btn-xs btn-danger delete-food" data-id="${food.id}">Delete</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-      adminMenuList.append(item);
-    });
-    
-    $('.delete-food').click(function() {
-      const id = $(this).data('id');
-      if (confirm('Delete this item?')) {
-        foodMenu = foodMenu.filter(f => f.id != id);
-        localStorage.setItem('foodMenu', JSON.stringify(foodMenu));
-        renderAdminDashboard();
-        renderMenu();
-      }
-    });
-    
-    // Orders list
-    renderOrdersList();
-  }
-  
-  function renderOrdersList() {
-    adminOrdersList.empty();
-    if (orders.length === 0) {
-      adminOrdersList.html('<p class="text-muted">No orders yet</p>');
-      return;
-    }
-    
-    orders.forEach((order, idx) => {
-      const itemsHtml = order.items.map(item => 
-        `${item.name} x${item.qty} (£${(item.price * item.qty).toFixed(2)})`
-      ).join('<br>');
-      
-      const orderHtml = `
-        <div class="card mb-2 bg-dark-2">
-          <div class="card-body p-2">
-            <div><strong>Order #${idx + 1}</strong></div>
-            <small class="text-muted">${new Date(order.date).toLocaleString()}</small>
-            <div class="mt-1">${itemsHtml}</div>
-            <div class="mt-1"><strong>Total: £${order.total.toFixed(2)}</strong></div>
-          </div>
-        </div>
-      `;
-      adminOrdersList.append(orderHtml);
-    });
-  }
+  // Admin functionality relocated to admin.js
   
   // Add to cart
   function addToCart(food) {
@@ -380,7 +259,6 @@ $(function() {
   $('#introButton').click(function() {
     intro.hide();
     main.fadeIn();
-    $('#fixedAdminButton').hide();
     renderMenu();
   });
   
