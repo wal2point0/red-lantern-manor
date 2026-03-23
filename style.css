@@ -45,6 +45,16 @@ body {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
+.mobile-only {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: inline-block !important;
+  }
+}
+
 /* ===== FOOD CARDS ===== */
 .food-card {
   background-color: rgba(45, 45, 45, 0.8);

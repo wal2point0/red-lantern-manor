@@ -20,6 +20,7 @@ $(function() {
   const cartEmpty = $('#cartEmpty');
   const cartTotal = $('#cartTotal');
   const voiceStart = $('#voiceStartBtn');
+  const voiceStop = $('#voiceStopBtn');
   const voiceStatus = $('#voiceStatus');
   const finalSpan = $('#final_span');
   const interimSpan = $('#interim_span');
@@ -64,6 +65,7 @@ $(function() {
     
     recognition.onstart = function() {
       voiceStatus.text('🎤 Listening...');
+      if (voiceStop) voiceStop.prop('disabled', false);
       finalSpan.text('');
       interimSpan.text('');
     };
@@ -84,6 +86,7 @@ $(function() {
     
     recognition.onend = function() {
       voiceStatus.text('✓ Done listening');
+      if (voiceStop) voiceStop.prop('disabled', true);
       if (finalTranscript.trim()) {
         processVoiceCommand(finalTranscript);
       }
@@ -383,6 +386,15 @@ $(function() {
     if (recognition) {
       finalTranscript = '';
       recognition.start();
+      if (voiceStop) voiceStop.prop('disabled', false);
+    }
+  });
+
+  voiceStop.click(function() {
+    if (recognition) {
+      recognition.stop();
+      voiceStatus.text('⏹️ Stopped listening');
+      voiceStop.prop('disabled', true);
     }
   });
   
