@@ -32,6 +32,9 @@ $(function() {
   const adminMenuList = $('#adminMenuList');
   const adminOrdersList = $('#adminOrdersList');
   
+  // Device detection
+  const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|BlackBerry/i.test(navigator.userAgent);
+  
   // Voice Recognition
   let recognition;
   let finalTranscript = '';
@@ -45,7 +48,6 @@ $(function() {
       return;
     }
     
-    const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|BlackBerry/i.test(navigator.userAgent);
     try {
       recognition = new SpeechRecognition();
       recognition.lang = 'en-GB';
@@ -420,7 +422,14 @@ $(function() {
     updateCart();
   });
   
-  // Init
+  // Setup mobile stop button and init
+  if (isMobile) {
+    voiceStop.show();
+    voiceStop.prop('disabled', true);
+  } else {
+    voiceStop.hide();
+  }
+
   initVoice();
   updateCart();
 });
