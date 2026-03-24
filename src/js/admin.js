@@ -1,5 +1,7 @@
 // Admin script for admin.html
 $(function() {
+  console.log('Admin script loaded');
+
   let foodMenu = JSON.parse(localStorage.getItem('foodMenu')) || [
     { id: 1, name: '🍕 Pizza', desc: 'Cheese pizza', price: 12.99 },
     { id: 2, name: '🍔 Burger', desc: 'Juicy burger', price: 10.99 },
@@ -8,15 +10,35 @@ $(function() {
 
   let orders = JSON.parse(localStorage.getItem('orders')) || [];
 
-  const adminLoginScreen = $('#adminLoginScreen');
   const adminPanel = $('#adminPanel');
-  const adminUsername = $('#adminUsername');
-  const adminPassword = $('#adminPassword');
-  const adminLoginBtn = $('#adminLoginBtn');
   const adminLogoutBtn = $('#adminLogout');
   const adminCreateBtn = $('#adminCreateFood');
   const adminMenuList = $('#adminMenuList');
   const adminOrdersList = $('#adminOrdersList');
+
+  // --- Session expiry helpers ---
+  function setAdminSession() {
+    const exp = Date.now() + (30 * 60 * 1000); // 30 min expiry
+    sessionStorage.setItem('isAdminLoggedIn', 'true');
+    sessionStorage.setItem('adminSessionExpiry', exp);
+  }
+
+  function isAdminSessionValid() {
+    const logged = sessionStorage.getItem('isAdminLoggedIn') === 'true';
+    const expiry = parseInt(sessionStorage.getItem('adminSessionExpiry'), 10);
+    return logged && expiry && Date.now() < expiry;
+  }
+
+  // Guard: only allow dashboard if logged in and not expired
+  if (window.location.pathname.endsWith('admin-dashboard.html')) {
+    if (!isAdminSessionValid()) {
+      sessionStorage.removeItem('isAdminLoggedIn');
+      sessionStorage.removeItem('adminSessionExpiry');
+      window.location.href = 'admin-login.html';
+      return;
+    }
+  }
+
 
   function renderAdminDashboard() {
     adminMenuList.empty();
@@ -77,25 +99,9 @@ $(function() {
     });
   }
 
-  adminLoginBtn.click(function() {
-    const username = adminUsername.val();
-    const password = adminPassword.val();
-
-    if (username === 'admin' && password === 'password') {
-      adminLoginScreen.hide();
-      adminPanel.show();
-      renderAdminDashboard();
-      alert('✓ Admin login successful!');
-    } else {
-      alert('❌ Invalid credentials');
-    }
-  });
-
   adminLogoutBtn.click(function() {
-    adminPanel.hide();
-    adminLoginScreen.show();
-    adminUsername.val('');
-    adminPassword.val('');
+    sessionStorage.removeItem('isAdminLoggedIn');
+    window.location.href = 'admin-login.html';
   });
 
   adminCreateBtn.click(function() {
@@ -122,5 +128,6 @@ $(function() {
     alert('✓ Food item created!');
   });
 
-  adminPanel.hide();
+  setAdminSession();
+  renderAdminDashboard();
 });
