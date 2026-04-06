@@ -40,6 +40,12 @@ $(function() {
   
   // Device detection
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|BlackBerry/i.test(navigator.userAgent);
+  const isSafariBrowser = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const safariAssistantAudio = {
+    intro: new Audio('../introSpeech.mp3'),
+    anythingElse: new Audio('../anythingElse.mp3'),
+    cart: new Audio('../cartSpeech.mp3')
+  };
   
   // Voice Recognition
   let recognition;
@@ -111,6 +117,54 @@ $(function() {
     return englishVoice || voices[0];
   }
 
+  function stopSafariAssistantAudio() {
+    Object.values(safariAssistantAudio).forEach(audio => {
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+      } catch (e) {
+        console.warn('Could not stop Safari assistant audio:', e);
+      }
+    });
+  }
+
+  function playSafariAssistantAudio(clipKey, listenAfter = false) {
+    if (!isSafariBrowser) return false;
+    const audio = safariAssistantAudio[clipKey];
+    if (!audio) return false;
+
+    stopSafariAssistantAudio();
+
+    const startListeningAfterClip = function() {
+      if (!listenAfter) return;
+      voiceStatus.text('🎤 Listening for your response...');
+      assistantResponseRetryCount = 0;
+      startVoiceRecognition();
+    };
+
+    audio.onended = startListeningAfterClip;
+    audio.onerror = function() {
+      console.warn('Safari assistant audio failed to play:', clipKey);
+      startListeningAfterClip();
+    };
+
+    try {
+      audio.currentTime = 0;
+      const playPromise = audio.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(function(err) {
+          console.warn('Safari assistant audio play blocked:', err);
+          startListeningAfterClip();
+        });
+      }
+      return true;
+    } catch (e) {
+      console.warn('Could not start Safari assistant audio:', e);
+      startListeningAfterClip();
+      return false;
+    }
+  }
+
   function setVoiceAssistantEnabled(enabled, persist = true) {
     voiceAssistantEnabled = !!enabled;
     if (persist) {
@@ -127,6 +181,7 @@ $(function() {
       pendingAssistantResponseText = '';
       finalTranscript = '';
       commandHandledDuringRecognition = false;
+      stopSafariAssistantAudio();
 
       if (recognition) {
         try {
@@ -165,6 +220,11 @@ $(function() {
       return;
     }
     if (!forceReplay && assistantHasWelcomed) {
+      return;
+    }
+
+    if (playSafariAssistantAudio('intro')) {
+      assistantHasWelcomed = true;
       return;
     }
 
@@ -207,10 +267,15 @@ $(function() {
     }
   }
 
-  function speakAssistantFollowUp(text, listenAfter = false) {
+  function speakAssistantFollowUp(text, listenAfter = false, safariClipKey = null) {
     if (!voiceAssistantEnabled) {
       return;
     }
+
+    if (safariClipKey && playSafariAssistantAudio(safariClipKey, listenAfter)) {
+      return;
+    }
+
     if (!window.speechSynthesis) {
       if (listenAfter) {
         startVoiceRecognition();
@@ -354,7 +419,7 @@ $(function() {
       assistantResponseRetryCount = 0;
       new bootstrap.Modal(document.getElementById('modalCart')).show();
       finalSpan.text('🛒 Here is your cart. Please confirm your order and checkout when you are ready.');
-      speakAssistantFollowUp('Here is your cart. Please confirm your order and checkout when you are ready.');
+      speakAssistantFollowUp('Here is your cart. Please confirm your order and checkout when you are ready.', false, 'cart');
       return;
     }
 
@@ -378,7 +443,7 @@ $(function() {
           .join(', ');
         finalSpan.text(`✓ Added ${summary} to cart!`);
         awaitingAssistantResponse = true;
-        speakAssistantFollowUp('Anything else?', true);
+        speakAssistantFollowUp('Anything else?', true, 'anythingElse');
         console.log('Added multiple items to cart:', parsedAddItems);
         return;
       }
@@ -401,7 +466,7 @@ $(function() {
           finalSpan.text('✓ Added ' + foundFood.name + ' to cart!');
         }
         awaitingAssistantResponse = true;
-        speakAssistantFollowUp('Anything else?', true);
+        speakAssistantFollowUp('Anything else?', true, 'anythingElse');
         console.log('Added to cart:', foundFood.name, 'qty:', addQuantity);
       } else {
         finalSpan.text('❌ Could not find that item. Try: "add dumplings", "add number 15", or tap Help for examples.');
