@@ -78,14 +78,18 @@ $(function() {
     $('.delete-food').click(async function() {
       const id = $(this).data('id');
       if (confirm('Delete this item?')) {
-        if (store) {
-          await store.deleteMenuItem(id);
-          await refreshDataFromStore();
-        } else {
-          foodMenu = foodMenu.filter(f => f.id != id);
-          localStorage.setItem('foodMenu', JSON.stringify(foodMenu));
+        try {
+          if (store) {
+            await store.deleteMenuItem(id);
+            await refreshDataFromStore();
+          } else {
+            foodMenu = foodMenu.filter(f => f.id != id);
+            localStorage.setItem('foodMenu', JSON.stringify(foodMenu));
+          }
+          renderAdminDashboard();
+        } catch (e) {
+          alert('Delete failed: ' + (e && e.message ? e.message : 'Unknown error'));
         }
-        renderAdminDashboard();
       }
     });
 

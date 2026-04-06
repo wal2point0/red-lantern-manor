@@ -68,8 +68,8 @@
       'Content-Type': 'application/json'
     };
 
-    // Ask Supabase to return inserted rows on writes.
-    if (method === 'POST' || method === 'PATCH') {
+    // Ask Supabase to return affected rows on writes.
+    if (method === 'POST' || method === 'PATCH' || method === 'DELETE') {
       headers.Prefer = 'return=representation';
     }
 
@@ -179,12 +179,29 @@
       if (this.isBackendConfigured()) {
         try {
           const cfg = getBackendConfig();
-          await supabaseRequest('DELETE', cfg.menuTable, '?id=eq.' + encodeURIComponent(id));
-          const latestMenu = await this.getMenu();
+          const targetId = Number(id);
+          await supabaseRequest('DELETE', cfg.menuTable, '?id=eq.' + encodeURIComponent(targetId));
+
+          const remaining = await supabaseRequest(
+            'GET',
+            cfg.menuTable,
+            '?select=id&id=eq.' + encodeURIComponent(targetId)
+          );
+          if (Array.isArray(remaining) && remaining.length > 0) {
+            throw new Error('Delete was blocked. Check Supabase RLS/policies for DELETE on menu_items.');
+          }
+
+          const latestRows = await supabaseRequest(
+            'GET',
+            cfg.menuTable,
+            '?select=id,number,name,description,price,image&order=number.asc,id.asc'
+          );
+          const latestMenu = normalizeMenu(latestRows || []);
           writeJson('foodMenu', latestMenu);
           return;
         } catch (e) {
-          console.warn('Backend delete failed, deleting locally:', e);
+          console.warn('Backend delete failed:', e);
+          throw e;
         }
       }
 
