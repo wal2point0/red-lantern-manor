@@ -886,12 +886,19 @@ $(function() {
   }
   
   // Show main content
-  $('#introButton').click(async function() {
+  $('#introButton').click(function() {
     speakAssistantIntro();
     intro.hide();
     main.fadeIn();
-    await refreshMenuData();
     renderMenu();
+
+    refreshMenuData()
+      .then(function() {
+        renderMenu();
+      })
+      .catch(function(err) {
+        console.warn('Could not refresh menu data after intro:', err);
+      });
   });
   
   voiceStart.click(function() {
