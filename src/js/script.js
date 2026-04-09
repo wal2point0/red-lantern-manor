@@ -41,6 +41,7 @@ $(function() {
   // Device detection
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|BlackBerry/i.test(navigator.userAgent);
   const isSafariBrowser = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const isIOSSafari = /iPad|iPhone|iPod/i.test(navigator.userAgent) && isSafariBrowser;
   const safariAssistantAudio = {
     intro: new Audio('../assets/audio/introSpeech.mp3'),
     anythingElse: new Audio('../assets/audio/anythingElse.mp3'),
@@ -55,6 +56,9 @@ $(function() {
   let commandHandledDuringRecognition = false;
   let assistantResponseRetryCount = 0;
   let pendingAssistantResponseText = '';
+  let latestInterimTranscript = '';
+  let interimFinalizeTimer = null;
+  let mobileSafariListenTimeout = null;
   let speechRecognitionSupported = true;
   let voiceAssistantEnabled = localStorage.getItem('voiceAssistantEnabled') !== 'false';
   const spokenNumbers = {
@@ -256,15 +260,65 @@ $(function() {
 
     try {
       finalTranscript = '';
+      latestInterimTranscript = '';
       commandHandledDuringRecognition = false;
       pendingAssistantResponseText = '';
-      recognition.continuous = !awaitingAssistantResponse;
-      recognition.interimResults = awaitingAssistantResponse;
+      if (interimFinalizeTimer) {
+        clearTimeout(interimFinalizeTimer);
+        interimFinalizeTimer = null;
+      }
+      if (mobileSafariListenTimeout) {
+        clearTimeout(mobileSafariListenTimeout);
+        mobileSafariListenTimeout = null;
+      }
+
+      const useQuickSingleUtteranceMode = isIOSSafari && !awaitingAssistantResponse;
+      recognition.continuous = useQuickSingleUtteranceMode ? false : !awaitingAssistantResponse;
+      recognition.interimResults = useQuickSingleUtteranceMode ? true : awaitingAssistantResponse;
       recognition.start();
+
+      if (isIOSSafari) {
+        // iOS Safari can pause for a long time before ending; force a short listen window.
+        mobileSafariListenTimeout = setTimeout(function() {
+          try {
+            recognition.stop();
+          } catch (e) {
+            console.warn('Could not auto-stop iOS Safari recognition:', e);
+          }
+        }, awaitingAssistantResponse ? 3800 : 2800);
+      }
+
       if (voiceStop) voiceStop.prop('disabled', false);
     } catch (e) {
       console.warn('Could not restart voice recognition:', e);
     }
+  }
+
+  function pickBestTranscriptFromResult(result) {
+    if (!result || !result.length) return '';
+
+    let best = result[0];
+    for (let i = 1; i < result.length; i++) {
+      const candidate = result[i];
+      if (!best) {
+        best = candidate;
+        continue;
+      }
+
+      const bestConfidence = Number(best.confidence || 0);
+      const candidateConfidence = Number(candidate.confidence || 0);
+
+      if (candidateConfidence > bestConfidence) {
+        best = candidate;
+        continue;
+      }
+
+      if (candidateConfidence === bestConfidence && String(candidate.transcript || '').length > String(best.transcript || '').length) {
+        best = candidate;
+      }
+    }
+
+    return String((best && best.transcript) || '').trim();
   }
 
   function speakAssistantFollowUp(text, listenAfter = false, safariClipKey = null) {
@@ -329,10 +383,11 @@ $(function() {
     
     try {
       recognition = new SpeechRecognition();
-      recognition.lang = 'en-GB';
-      recognition.maxAlternatives = 5;
-      recognition.continuous = true; // keep listening for better mobile recognition
-      recognition.interimResults = false; // use final transcripts to reduce noise on mobile
+      const preferredLang = (navigator.language || 'en-GB').toLowerCase();
+      recognition.lang = /^en(-|_)/.test(preferredLang) ? preferredLang : 'en-GB';
+      recognition.maxAlternatives = isIOSSafari ? 8 : 5;
+      recognition.continuous = !isIOSSafari;
+      recognition.interimResults = isIOSSafari;
       if (isMobile) {
         voiceStatus.text('🎤 Mobile mode: speak clearly and pause after phrase');
       }
@@ -353,16 +408,39 @@ $(function() {
     
     recognition.onresult = function(event) {
       let interim = '';
+
+      if (mobileSafariListenTimeout) {
+        clearTimeout(mobileSafariListenTimeout);
+        mobileSafariListenTimeout = null;
+      }
+
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
+        const transcript = pickBestTranscriptFromResult(event.results[i]);
         if (event.results[i].isFinal) {
           finalTranscript += transcript + ' ';
+          latestInterimTranscript = '';
         } else {
-          interim += transcript;
+          interim += transcript + ' ';
         }
       }
+
+      latestInterimTranscript = interim.trim();
       finalSpan.text(finalTranscript.trim());
       interimSpan.text(interim);
+
+      if (isIOSSafari && !finalTranscript.trim() && latestInterimTranscript) {
+        if (interimFinalizeTimer) {
+          clearTimeout(interimFinalizeTimer);
+        }
+        // If only interim text is available, end capture quickly and process it.
+        interimFinalizeTimer = setTimeout(function() {
+          try {
+            recognition.stop();
+          } catch (e) {
+            console.warn('Could not stop iOS Safari recognition after interim:', e);
+          }
+        }, 550);
+      }
 
       if (awaitingAssistantResponse) {
         const quickResponse = normalizeVoiceCommand(`${finalTranscript} ${interim}`.trim());
@@ -378,33 +456,55 @@ $(function() {
     recognition.onend = function() {
       voiceStatus.text('✓ Done listening');
       if (voiceStop) voiceStop.prop('disabled', true);
+
+      if (interimFinalizeTimer) {
+        clearTimeout(interimFinalizeTimer);
+        interimFinalizeTimer = null;
+      }
+      if (mobileSafariListenTimeout) {
+        clearTimeout(mobileSafariListenTimeout);
+        mobileSafariListenTimeout = null;
+      }
+
       if (pendingAssistantResponseText) {
         const responseText = pendingAssistantResponseText;
         pendingAssistantResponseText = '';
         processVoiceCommand(responseText);
         finalTranscript = '';
+        latestInterimTranscript = '';
         commandHandledDuringRecognition = false;
         return;
       }
 
-      if (!finalTranscript.trim() && awaitingAssistantResponse && assistantResponseRetryCount < 1) {
+      if (!finalTranscript.trim() && !latestInterimTranscript.trim() && awaitingAssistantResponse && assistantResponseRetryCount < 1) {
         assistantResponseRetryCount++;
         voiceStatus.text('🎤 Listening for your response...');
         setTimeout(startVoiceRecognition, 150);
         return;
       }
 
-      if (finalTranscript.trim() && !commandHandledDuringRecognition) {
-        processVoiceCommand(finalTranscript);
-      } else if (commandHandledDuringRecognition && finalTranscript.trim()) {
-        processVoiceCommand(finalTranscript);
+      const transcriptToProcess = finalTranscript.trim() || latestInterimTranscript.trim();
+
+      if (transcriptToProcess && !commandHandledDuringRecognition) {
+        processVoiceCommand(transcriptToProcess);
+      } else if (commandHandledDuringRecognition && transcriptToProcess) {
+        processVoiceCommand(transcriptToProcess);
       }
       finalTranscript = '';
+      latestInterimTranscript = '';
       commandHandledDuringRecognition = false;
       pendingAssistantResponseText = '';
     };
     
     recognition.onerror = function(event) {
+      if (interimFinalizeTimer) {
+        clearTimeout(interimFinalizeTimer);
+        interimFinalizeTimer = null;
+      }
+      if (mobileSafariListenTimeout) {
+        clearTimeout(mobileSafariListenTimeout);
+        mobileSafariListenTimeout = null;
+      }
       voiceStatus.text('❌ Error: ' + event.error);
     };
   }
@@ -495,7 +595,7 @@ $(function() {
       }
       awaitingAssistantResponse = false;
       assistantResponseRetryCount = 0;
-      finalSpan.text('⚠️ Command not recognized. Try: "add pizza", "show cart", or "show menu"');
+      finalSpan.text('⚠️ Command not recognized. Try: "add dumplings", "show cart", or "show menu"');
       console.log('Unrecognized command:', text);
     }
   }
