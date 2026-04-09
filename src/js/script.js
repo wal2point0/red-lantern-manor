@@ -272,20 +272,25 @@ $(function() {
         mobileSafariListenTimeout = null;
       }
 
-      const useQuickSingleUtteranceMode = isIOSSafari && !awaitingAssistantResponse;
-      recognition.continuous = useQuickSingleUtteranceMode ? false : !awaitingAssistantResponse;
-      recognition.interimResults = useQuickSingleUtteranceMode ? true : awaitingAssistantResponse;
+      const useQuickSingleUtteranceMode = isIOSSafari && awaitingAssistantResponse;
+      if (isIOSSafari) {
+        recognition.continuous = !useQuickSingleUtteranceMode;
+        recognition.interimResults = true;
+      } else {
+        recognition.continuous = !awaitingAssistantResponse;
+        recognition.interimResults = awaitingAssistantResponse;
+      }
       recognition.start();
 
-      if (isIOSSafari) {
-        // iOS Safari can pause for a long time before ending; force a short listen window.
+      if (isIOSSafari && useQuickSingleUtteranceMode) {
+        // Use a short window only for brief follow-up replies like "no".
         mobileSafariListenTimeout = setTimeout(function() {
           try {
             recognition.stop();
           } catch (e) {
             console.warn('Could not auto-stop iOS Safari recognition:', e);
           }
-        }, awaitingAssistantResponse ? 3800 : 2800);
+        }, 4500);
       }
 
       if (voiceStop) voiceStop.prop('disabled', false);
@@ -428,18 +433,18 @@ $(function() {
       finalSpan.text(finalTranscript.trim());
       interimSpan.text(interim);
 
-      if (isIOSSafari && !finalTranscript.trim() && latestInterimTranscript) {
+      if (isIOSSafari && awaitingAssistantResponse && !finalTranscript.trim() && latestInterimTranscript) {
         if (interimFinalizeTimer) {
           clearTimeout(interimFinalizeTimer);
         }
-        // If only interim text is available, end capture quickly and process it.
+        // In follow-up mode, promote stable interim text if final text never arrives.
         interimFinalizeTimer = setTimeout(function() {
           try {
             recognition.stop();
           } catch (e) {
             console.warn('Could not stop iOS Safari recognition after interim:', e);
           }
-        }, 550);
+        }, 1200);
       }
 
       if (awaitingAssistantResponse) {
