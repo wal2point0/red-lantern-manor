@@ -44,7 +44,6 @@ $(function() {
   const isIOSSafari = /iPad|iPhone|iPod/i.test(navigator.userAgent) && isSafariBrowser;
   const backendCfg = window.RED_LANTERN_BACKEND || {};
   const sttProxyUrl = String(backendCfg.sttProxyUrl || '').trim();
-  const sttAuthToken = String(backendCfg.sttAuthToken || '').trim();
   const cloudSTTSupported = !!(
     isIOSSafari &&
     sttProxyUrl &&
@@ -303,10 +302,11 @@ $(function() {
     formData.append('language', (navigator.language || 'en-GB'));
     formData.append('context', foodMenu.map(function(item) { return item.name; }).join(', '));
 
-    const headers = {};
-    if (sttAuthToken) {
-      headers.Authorization = 'Bearer ' + sttAuthToken;
-    }
+    const supabaseAnonKey = String(backendCfg.anonKey || '').trim();
+    const headers = {
+      apikey: supabaseAnonKey,
+      Authorization: 'Bearer ' + supabaseAnonKey
+    };
 
     const response = await fetch(sttProxyUrl, {
       method: 'POST',

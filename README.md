@@ -32,8 +32,13 @@ If Safari voice recognition quality is poor on iPhone, you can route voice trans
 
 1. Open `src/js/backend-config.js`.
 2. Set `sttProxyUrl` to your speech-to-text proxy endpoint.
-3. Optionally set `sttAuthToken` for proxy authorization.
-4. Keep the proxy responsible for provider secrets (Deepgram/Google/Azure/etc.).
+3. Keep the proxy responsible for provider secrets (Deepgram/Google/Azure/etc.).
+
+Recommended function secrets:
+
+- `DEEPGRAM_API_KEY` (required)
+- `SUPABASE_ANON_KEY` (recommended)
+- `ALLOWED_ORIGINS` (optional CSV allowlist, e.g. `https://yourdomain.com,http://localhost:3000`)
 
 Expected proxy response JSON:
 
@@ -46,6 +51,8 @@ When `sttProxyUrl` is configured on iPhone Safari:
 - The clip is sent to your proxy for transcription.
 - Returned text is processed by the existing command parser.
 - If cloud transcription fails, the app falls back to browser recognition.
+
+Note: no custom STT bearer token is required in frontend config.
 
 ## Admin flow
 1. Open `admin-login.html`.

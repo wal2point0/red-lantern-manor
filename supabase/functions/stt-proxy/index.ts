@@ -20,7 +20,12 @@ serve(async (req) => {
 
   try {
     const deepgramApiKey = Deno.env.get("DEEPGRAM_API_KEY");
-    const expectedToken = Deno.env.get("STT_AUTH_TOKEN") || "";
+    const requiredAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    const allowedOriginsCsv = Deno.env.get("ALLOWED_ORIGINS") || "";
+    const allowedOrigins = allowedOriginsCsv
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
     if (!deepgramApiKey) {
       return new Response(JSON.stringify({ error: "Server not configured" }), {
@@ -29,10 +34,16 @@ serve(async (req) => {
       });
     }
 
-    const authHeader = req.headers.get("authorization") || "";
-    const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    const origin = req.headers.get("origin") || "";
+    if (allowedOrigins.length && origin && !allowedOrigins.includes(origin)) {
+      return new Response(JSON.stringify({ error: "Origin not allowed" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
 
-    if (expectedToken && bearer !== expectedToken) {
+    const apikey = req.headers.get("apikey") || "";
+    if (requiredAnonKey && apikey !== requiredAnonKey) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
