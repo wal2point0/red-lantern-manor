@@ -42,6 +42,16 @@ $(function() {
   const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|BlackBerry/i.test(navigator.userAgent);
   const isSafariBrowser = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
   const isIOSSafari = /iPad|iPhone|iPod/i.test(navigator.userAgent) && isSafariBrowser;
+  const backendCfg = window.RED_LANTERN_BACKEND || {};
+  const sttProxyUrl = String(backendCfg.sttProxyUrl || '').trim();
+  const sttAuthToken = String(backendCfg.sttAuthToken || '').trim();
+  const cloudSTTSupported = !!(
+    isIOSSafari &&
+    sttProxyUrl &&
+    window.MediaRecorder &&
+    navigator.mediaDevices &&
+    navigator.mediaDevices.getUserMedia
+  );
   const safariAssistantAudio = {
     intro: new Audio('../assets/audio/introSpeech.mp3'),
     anythingElse: new Audio('../assets/audio/anythingElse.mp3'),
@@ -59,6 +69,10 @@ $(function() {
   let latestInterimTranscript = '';
   let interimFinalizeTimer = null;
   let mobileSafariListenTimeout = null;
+  let mediaRecorder = null;
+  let mediaRecorderChunks = [];
+  let mediaRecorderStopTimeout = null;
+  let cloudCaptureInProgress = false;
   let speechRecognitionSupported = true;
   let voiceAssistantEnabled = localStorage.getItem('voiceAssistantEnabled') !== 'false';
   const spokenNumbers = {
@@ -194,6 +208,18 @@ $(function() {
           console.warn('Could not stop voice recognition:', e);
         }
       }
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        try {
+          mediaRecorder.stop();
+        } catch (e) {
+          console.warn('Could not stop cloud voice recorder:', e);
+        }
+      }
+      if (mediaRecorderStopTimeout) {
+        clearTimeout(mediaRecorderStopTimeout);
+        mediaRecorderStopTimeout = null;
+      }
+      cloudCaptureInProgress = false;
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
@@ -249,11 +275,166 @@ $(function() {
     assistantHasWelcomed = true;
   }
 
-  function startVoiceRecognition() {
+  function pickSupportedRecordingMimeType() {
+    if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) {
+      return '';
+    }
+
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/mp4',
+      'audio/aac',
+      'audio/webm',
+      'audio/ogg;codecs=opus'
+    ];
+
+    for (let i = 0; i < candidates.length; i++) {
+      if (MediaRecorder.isTypeSupported(candidates[i])) {
+        return candidates[i];
+      }
+    }
+
+    return '';
+  }
+
+  async function transcribeCloudAudio(audioBlob) {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'voice-command.webm');
+    formData.append('language', (navigator.language || 'en-GB'));
+    formData.append('context', foodMenu.map(function(item) { return item.name; }).join(', '));
+
+    const headers = {};
+    if (sttAuthToken) {
+      headers.Authorization = 'Bearer ' + sttAuthToken;
+    }
+
+    const response = await fetch(sttProxyUrl, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error('Cloud STT request failed (' + response.status + '): ' + errText);
+    }
+
+    const payload = await response.json();
+    return String(payload.text || payload.transcript || payload.result || '').trim();
+  }
+
+  async function startCloudVoiceCapture() {
     if (!voiceAssistantEnabled) {
       voiceStatus.text('🔇 Voice assistant is off');
       return;
     }
+    if (cloudCaptureInProgress) {
+      return;
+    }
+
+    const maxCaptureMs = awaitingAssistantResponse ? 4500 : 7000;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = pickSupportedRecordingMimeType();
+      const recorderOptions = mimeType ? { mimeType: mimeType } : undefined;
+
+      mediaRecorderChunks = [];
+      mediaRecorder = new MediaRecorder(stream, recorderOptions);
+      cloudCaptureInProgress = true;
+
+      mediaRecorder.ondataavailable = function(event) {
+        if (event.data && event.data.size > 0) {
+          mediaRecorderChunks.push(event.data);
+        }
+      };
+
+      mediaRecorder.onerror = function(event) {
+        console.warn('Cloud STT recorder error:', event && event.error ? event.error : event);
+        voiceStatus.text('❌ Voice capture error');
+      };
+
+      mediaRecorder.onstop = async function() {
+        if (mediaRecorderStopTimeout) {
+          clearTimeout(mediaRecorderStopTimeout);
+          mediaRecorderStopTimeout = null;
+        }
+
+        stream.getTracks().forEach(function(track) { track.stop(); });
+        cloudCaptureInProgress = false;
+
+        if (!mediaRecorderChunks.length) {
+          voiceStatus.text('⚠️ No speech detected. Try again.');
+          if (voiceStop) voiceStop.prop('disabled', true);
+          return;
+        }
+
+        const type = mimeType || 'audio/webm';
+        const audioBlob = new Blob(mediaRecorderChunks, { type: type });
+        mediaRecorderChunks = [];
+
+        try {
+          voiceStatus.text('☁️ Transcribing...');
+          const transcript = await transcribeCloudAudio(audioBlob);
+
+          if (!transcript) {
+            voiceStatus.text('⚠️ Could not understand. Please try again.');
+            return;
+          }
+
+          finalSpan.text(transcript);
+          interimSpan.text('');
+          voiceStatus.text('✓ Done listening');
+          processVoiceCommand(transcript);
+        } catch (e) {
+          console.warn('Cloud STT failed:', e);
+          if (recognition) {
+            voiceStatus.text('⚠️ Cloud transcription failed. Falling back to browser voice.');
+            startVoiceRecognition(false);
+          } else {
+            voiceStatus.text('⚠️ Cloud transcription failed. Please try again.');
+          }
+        } finally {
+          if (voiceStop) voiceStop.prop('disabled', true);
+          mediaRecorder = null;
+        }
+      };
+
+      mediaRecorder.start(250);
+      voiceStatus.text('🎤 Listening...');
+      finalSpan.text('');
+      interimSpan.text('');
+      if (voiceStop) voiceStop.prop('disabled', false);
+
+      mediaRecorderStopTimeout = setTimeout(function() {
+        if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+          return;
+        }
+        try {
+          mediaRecorder.stop();
+        } catch (e) {
+          console.warn('Could not stop cloud recorder:', e);
+        }
+      }, maxCaptureMs);
+    } catch (e) {
+      console.warn('Could not start cloud voice capture:', e);
+      cloudCaptureInProgress = false;
+      voiceStatus.text('⚠️ Could not access microphone');
+      startVoiceRecognition(false);
+    }
+  }
+
+  function startVoiceRecognition(allowCloud = true) {
+    if (!voiceAssistantEnabled) {
+      voiceStatus.text('🔇 Voice assistant is off');
+      return;
+    }
+
+    if (allowCloud && cloudSTTSupported) {
+      startCloudVoiceCapture();
+      return;
+    }
+
     if (!recognition) {
       return;
     }
@@ -379,6 +560,14 @@ $(function() {
   function initVoice() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
+      if (cloudSTTSupported) {
+        speechRecognitionSupported = true;
+        if (isMobile) {
+          voiceStatus.text('🎤 Mobile mode: cloud speech recognition enabled');
+        }
+        return;
+      }
+
       speechRecognitionSupported = false;
       voiceStatus.text('⚠️ Voice not supported in this browser');
       voiceStart.prop('disabled', true);
@@ -390,11 +579,11 @@ $(function() {
       recognition = new SpeechRecognition();
       const preferredLang = (navigator.language || 'en-GB').toLowerCase();
       recognition.lang = /^en(-|_)/.test(preferredLang) ? preferredLang : 'en-GB';
-      recognition.maxAlternatives = isIOSSafari ? 8 : 5;
-      recognition.continuous = !isIOSSafari;
-      recognition.interimResults = isIOSSafari;
+      recognition.maxAlternatives = cloudSTTSupported ? 5 : (isIOSSafari ? 8 : 5);
+      recognition.continuous = cloudSTTSupported ? false : !isIOSSafari;
+      recognition.interimResults = cloudSTTSupported ? true : isIOSSafari;
       if (isMobile) {
-        voiceStatus.text('🎤 Mobile mode: speak clearly and pause after phrase');
+        voiceStatus.text(cloudSTTSupported ? '🎤 Mobile mode: cloud speech recognition enabled' : '🎤 Mobile mode: speak clearly and pause after phrase');
       }
       console.log('✓ Speech recognition initialized successfully');
     } catch (e) {
@@ -1015,6 +1204,17 @@ $(function() {
   });
 
   voiceStop.click(function() {
+    if (cloudCaptureInProgress && mediaRecorder && mediaRecorder.state !== 'inactive') {
+      try {
+        mediaRecorder.stop();
+      } catch (e) {
+        console.warn('Could not stop cloud recorder from stop button:', e);
+      }
+      voiceStatus.text('⏹️ Stopped listening');
+      voiceStop.prop('disabled', true);
+      return;
+    }
+
     if (recognition) {
       recognition.stop();
       voiceStatus.text('⏹️ Stopped listening');

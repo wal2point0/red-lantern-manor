@@ -26,6 +26,27 @@ To share menu/orders across browsers, configure Supabase:
 
 When configured, storefront and admin pages will read/write via Supabase REST, with local fallback if backend is unavailable.
 
+## Optional iPhone Safari voice upgrade (cloud STT)
+
+If Safari voice recognition quality is poor on iPhone, you can route voice transcription through a server endpoint:
+
+1. Open `src/js/backend-config.js`.
+2. Set `sttProxyUrl` to your speech-to-text proxy endpoint.
+3. Optionally set `sttAuthToken` for proxy authorization.
+4. Keep the proxy responsible for provider secrets (Deepgram/Google/Azure/etc.).
+
+Expected proxy response JSON:
+
+- `{ "text": "add two dumplings" }` or
+- `{ "transcript": "add two dumplings" }`
+
+When `sttProxyUrl` is configured on iPhone Safari:
+
+- Voice input captures short audio clips client-side.
+- The clip is sent to your proxy for transcription.
+- Returned text is processed by the existing command parser.
+- If cloud transcription fails, the app falls back to browser recognition.
+
 ## Admin flow
 1. Open `admin-login.html`.
 2. Login with valid admin credentials.
