@@ -68,6 +68,7 @@ $(function() {
   let latestInterimTranscript = '';
   let interimFinalizeTimer = null;
   let mobileSafariListenTimeout = null;
+  let assistantAudioUnlocked = false;
   let mediaRecorder = null;
   let mediaRecorderChunks = [];
   let mediaRecorderStopTimeout = null;
@@ -180,6 +181,35 @@ $(function() {
       startListeningAfterClip();
       return false;
     }
+  }
+
+  function unlockSafariAssistantAudio() {
+    if (!isSafariBrowser || assistantAudioUnlocked) return;
+
+    Object.values(safariAssistantAudio).forEach(audio => {
+      try {
+        audio.muted = true;
+        audio.currentTime = 0;
+        const p = audio.play();
+        if (p && typeof p.then === 'function') {
+          p.then(function() {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.muted = false;
+          }).catch(function() {
+            audio.muted = false;
+          });
+        } else {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.muted = false;
+        }
+      } catch (e) {
+        audio.muted = false;
+      }
+    });
+
+    assistantAudioUnlocked = true;
   }
 
   function setVoiceAssistantEnabled(enabled, persist = true) {
@@ -596,15 +626,21 @@ $(function() {
       interimSpan.text('');
     }
 
-    const preferTtsForCloudSafariFollowUp = isIOSSafari && cloudSTTSupported && safariClipKey === 'anythingElse';
-    if (!preferTtsForCloudSafariFollowUp && safariClipKey && playSafariAssistantAudio(safariClipKey, listenAfter)) {
+    if (safariClipKey && playSafariAssistantAudio(safariClipKey, listenAfter)) {
       return;
     }
 
+    let listenStarted = false;
+    const startListeningSafely = function() {
+      if (!listenAfter || listenStarted) return;
+      listenStarted = true;
+      voiceStatus.text('🎤 Listening for your response...');
+      assistantResponseRetryCount = 0;
+      startVoiceRecognition();
+    };
+
     if (!window.speechSynthesis) {
-      if (listenAfter) {
-        startVoiceRecognition();
-      }
+      startListeningSafely();
       return;
     }
 
@@ -620,15 +656,17 @@ $(function() {
     utterance.pitch = 1.1;
 
     if (listenAfter) {
-      utterance.onend = function() {
-        voiceStatus.text('🎤 Listening for your response...');
-        assistantResponseRetryCount = 0;
-        startVoiceRecognition();
-      };
+      utterance.onend = startListeningSafely;
+      utterance.onerror = startListeningSafely;
+      setTimeout(startListeningSafely, 2500);
     }
 
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+    try {
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      startListeningSafely();
+    }
   }
 
   function initVoiceAssistant() {
@@ -1267,6 +1305,7 @@ $(function() {
   
   // Show main content
   $('#introButton').click(function() {
+    unlockSafariAssistantAudio();
     speakAssistantIntro();
     intro.hide();
     main.fadeIn();
@@ -1282,6 +1321,7 @@ $(function() {
   });
   
   voiceStart.click(function() {
+    unlockSafariAssistantAudio();
     if (!voiceAssistantEnabled) {
       voiceStatus.text('🔇 Voice assistant is off');
       return;
