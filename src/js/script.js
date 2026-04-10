@@ -388,7 +388,11 @@ $(function() {
           processVoiceCommand(transcript);
         } catch (e) {
           console.warn('Cloud STT failed:', e);
-          if (recognition) {
+          if (isIOSSafari && cloudSTTSupported) {
+            finalSpan.text('');
+            interimSpan.text('');
+            voiceStatus.text('⚠️ Cloud transcription failed. Check function auth/origin settings.');
+          } else if (recognition) {
             voiceStatus.text('⚠️ Cloud transcription failed. Falling back to browser voice.');
             startVoiceRecognition(false);
           } else {
@@ -419,8 +423,12 @@ $(function() {
     } catch (e) {
       console.warn('Could not start cloud voice capture:', e);
       cloudCaptureInProgress = false;
-      voiceStatus.text('⚠️ Could not access microphone');
-      startVoiceRecognition(false);
+      if (isIOSSafari && cloudSTTSupported) {
+        voiceStatus.text('⚠️ Could not access microphone for cloud STT');
+      } else {
+        voiceStatus.text('⚠️ Could not access microphone');
+        startVoiceRecognition(false);
+      }
     }
   }
 
