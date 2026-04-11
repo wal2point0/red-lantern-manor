@@ -45,12 +45,12 @@ $(function() {
   const backendCfg = window.RED_LANTERN_BACKEND || {};
   const sttProxyUrl = String(backendCfg.sttProxyUrl || '').trim();
   const cloudSTTSupported = !!(
-    isIOSSafari &&
     sttProxyUrl &&
     window.MediaRecorder &&
     navigator.mediaDevices &&
     navigator.mediaDevices.getUserMedia
   );
+  const cloudSTTPreferred = isIOSSafari;
   const safariAssistantAudio = {
     intro: new Audio('../assets/audio/introSpeech.mp3'),
     anythingElse: new Audio('../assets/audio/anythingElse.mp3'),
@@ -538,7 +538,7 @@ $(function() {
       return;
     }
 
-    if (allowCloud && cloudSTTSupported) {
+    if (allowCloud && cloudSTTSupported && (cloudSTTPreferred || !recognition)) {
       startCloudVoiceCapture();
       return;
     }
@@ -686,9 +686,7 @@ $(function() {
     if (!SpeechRecognition) {
       if (cloudSTTSupported) {
         speechRecognitionSupported = true;
-        if (isMobile) {
-          voiceStatus.text('🎤 Mobile mode: cloud speech recognition enabled');
-        }
+        voiceStatus.text(isMobile ? '🎤 Mobile mode: cloud speech recognition enabled' : '🎤 Cloud speech recognition enabled');
         return;
       }
 
@@ -703,11 +701,11 @@ $(function() {
       recognition = new SpeechRecognition();
       const preferredLang = (navigator.language || 'en-GB').toLowerCase();
       recognition.lang = /^en(-|_)/.test(preferredLang) ? preferredLang : 'en-GB';
-      recognition.maxAlternatives = cloudSTTSupported ? 5 : (isIOSSafari ? 8 : 5);
-      recognition.continuous = cloudSTTSupported ? false : !isIOSSafari;
-      recognition.interimResults = cloudSTTSupported ? true : isIOSSafari;
+      recognition.maxAlternatives = isIOSSafari ? 8 : 5;
+      recognition.continuous = !isIOSSafari;
+      recognition.interimResults = isIOSSafari;
       if (isMobile) {
-        voiceStatus.text(cloudSTTSupported ? '🎤 Mobile mode: cloud speech recognition enabled' : '🎤 Mobile mode: speak clearly and pause after phrase');
+        voiceStatus.text(cloudSTTPreferred ? '🎤 Mobile mode: cloud speech recognition enabled' : '🎤 Mobile mode: speak clearly and pause after phrase');
       }
       console.log('✓ Speech recognition initialized successfully');
     } catch (e) {
