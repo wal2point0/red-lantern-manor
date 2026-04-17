@@ -3,6 +3,8 @@
 window.RED_LANTERN_BACKEND = {
   supabaseUrl: 'https://dwgainmsnohhmavxnxsw.supabase.co',
   anonKey: 'sb_publishable_iAGkZkJohQ1Ps1K2r-TKfw_8Q5nhXV7',
+  // Optional: set only if your function still requires a real JWT bearer token.
+  functionAuthToken: '',
   menuTable: 'menu_items',
   ordersTable: 'orders',
 

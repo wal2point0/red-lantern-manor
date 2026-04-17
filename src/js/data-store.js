@@ -46,15 +46,21 @@
     const cfg = window.RED_LANTERN_BACKEND || {};
     const supabaseUrl = (cfg.supabaseUrl || '').trim().replace(/\/$/, '');
     const anonKey = (cfg.anonKey || '').trim();
+    const functionAuthToken = (cfg.functionAuthToken || '').trim();
     const enabled = !!(supabaseUrl && anonKey);
 
     return {
       enabled,
       supabaseUrl,
       anonKey,
+      functionAuthToken,
       menuTable: cfg.menuTable || 'menu_items',
       ordersTable: cfg.ordersTable || 'orders'
     };
+  }
+
+  function looksLikeJwt(value) {
+    return /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/.test(String(value || '').trim());
   }
 
   async function supabaseRequest(method, table, query, body) {
@@ -64,9 +70,12 @@
     const url = cfg.supabaseUrl + '/rest/v1/' + table + (query || '');
     const headers = {
       apikey: cfg.anonKey,
-      Authorization: 'Bearer ' + cfg.anonKey,
       'Content-Type': 'application/json'
     };
+    const bearerToken = cfg.functionAuthToken || (looksLikeJwt(cfg.anonKey) ? cfg.anonKey : '');
+    if (bearerToken) {
+      headers.Authorization = 'Bearer ' + bearerToken;
+    }
 
     // Ask Supabase to return affected rows on writes.
     if (method === 'POST' || method === 'PATCH' || method === 'DELETE') {

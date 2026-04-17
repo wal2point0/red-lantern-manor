@@ -326,17 +326,34 @@ $(function() {
     return '';
   }
 
+  function looksLikeJwt(value) {
+    return /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/.test(String(value || '').trim());
+  }
+
+  function buildCloudSttHeaders() {
+    const supabaseAnonKey = String(backendCfg.anonKey || '').trim();
+    const functionAuthToken = String(backendCfg.functionAuthToken || '').trim();
+    const headers = {};
+
+    if (supabaseAnonKey) {
+      headers.apikey = supabaseAnonKey;
+    }
+
+    const bearerToken = functionAuthToken || (looksLikeJwt(supabaseAnonKey) ? supabaseAnonKey : '');
+    if (bearerToken) {
+      headers.Authorization = 'Bearer ' + bearerToken;
+    }
+
+    return headers;
+  }
+
   async function transcribeCloudAudio(audioBlob) {
     const formData = new FormData();
     formData.append('audio', audioBlob, 'voice-command.webm');
     formData.append('language', (navigator.language || 'en-GB'));
     formData.append('context', foodMenu.map(function(item) { return item.name; }).join(', '));
 
-    const supabaseAnonKey = String(backendCfg.anonKey || '').trim();
-    const headers = {
-      apikey: supabaseAnonKey,
-      Authorization: 'Bearer ' + supabaseAnonKey
-    };
+    const headers = buildCloudSttHeaders();
 
     const response = await fetch(sttProxyUrl, {
       method: 'POST',
